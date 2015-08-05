@@ -780,7 +780,7 @@ write_header_include_file(Basename, Messages) when is_list(Basename) ->
     protobuffs_file:close(FileRef);
 write_header_include_file(_FileRef, []) ->
     ok;
-    write_header_include_file(FileRef, [{Name, Fields, Extends} | Tail]) ->
+write_header_include_file(FileRef, [{Name, Fields, Extends} | Tail]) ->
     OutFields = [{string:to_lower(A), Optional, Default} || {_, Optional, _, A, Default} <- lists:keysort(1, Fields)],
     DefName = string:to_upper(Name) ++ "_PB_H",
     protobuffs_file:format(FileRef, "-ifndef(~s).~n-define(~s, true).~n", [DefName, DefName]),
@@ -805,7 +805,7 @@ generate_field_definitions(Fields) ->
 %% @hidden
 generate_field_definitions([], Acc) ->
     lists:reverse(Acc);
-generate_field_definitions([{Name, required, _} | Tail], Acc) ->
+generate_field_definitions([{Name, required, none} | Tail], Acc) ->
     Head = lists:flatten(io_lib:format("~s = erlang:error({required, ~s})", [Name, Name])),
     generate_field_definitions(Tail, [Head | Acc]);
 generate_field_definitions([{Name, _, none} | Tail], Acc) ->
