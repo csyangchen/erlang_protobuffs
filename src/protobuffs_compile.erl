@@ -778,6 +778,7 @@ resolve_types([], _, _, Acc) ->
 
 %% @hidden
 write_header_include_file(Basename, Messages) when is_list(Basename) ->
+    messages_check(Messages),
     {ok, FileRef} = protobuffs_file:open(Basename, [write]),
     write_header_include_file(FileRef, Messages),
     protobuffs_file:close(FileRef);
@@ -943,3 +944,20 @@ type_path_to_type(TypePath) ->
         false ->
             TypePath
     end.
+
+messages_check([]) ->
+    ok;
+messages_check([{Name, Fields, _Extends} | L]) ->
+    NumTags = lists:sort([element(1, Field) || Field <- Fields]),
+    case lists:seq(1, length(Fields)) of
+        NumTags -> ok;
+        _ -> exit({number_tag_error, Name, NumTags})
+    end,
+
+    InvalidLabels = [Label || {_, Label, _, _, _} <- Fields, not lists:member(Label, [required, optional, repeated])],
+    case InvalidLabels of
+        [] -> ok;
+        _ -> exit({invalid_labels, Name, InvalidLabels})
+    end,
+
+    messages_check(L).
