@@ -179,6 +179,7 @@ output_source(Basename, MessagesRaw, Enums, Options) ->
 
 %% @hidden
 parse_file(FileName) ->
+    error_logger:info_msg("Parse file ~p~n", [FileName]),
     {ok, InFile} = protobuffs_file:open(FileName, [read]),
     String = parse_file(InFile, []),
     file:close(InFile),
