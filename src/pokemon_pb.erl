@@ -25,7 +25,7 @@
 -module(pokemon_pb).
 -export([encode_pikachu/1, decode_pikachu/1, delimited_decode_pikachu/1]).
 -export([has_extension/2, extension_size/1, get_extension/2,
-         set_extension/3]).
+    set_extension/3]).
 -export([decode_extensions/1]).
 -export([encode/1, decode/2, delimited_decode/2]).
 -export([int_to_enum/2, enum_to_int/2]).
@@ -47,7 +47,7 @@ encode_pikachu(Record) when is_record(Record, pikachu) ->
 encode(pikachu, Records) when is_list(Records) ->
     delimited_encode(Records);
 encode(pikachu, Record) ->
-    [iolist(pikachu, Record)|encode_extensions(Record)].
+    [iolist(pikachu, Record) | encode_extensions(Record)].
 
 encode_extensions(#pikachu{'$extensions' = Extends}) ->
     [pack(Key, Optionalness, Data, Type, Accer) ||
@@ -80,30 +80,30 @@ pack(FNum, required, undefined, Type, _) ->
 pack(_, repeated, [], _, Acc) ->
     lists:reverse(Acc);
 
-pack(FNum, repeated, [Head|Tail], Type, Acc) ->
-    pack(FNum, repeated, Tail, Type, [pack(FNum, optional, Head, Type, [])|Acc]);
+pack(FNum, repeated, [Head | Tail], Type, Acc) ->
+    pack(FNum, repeated, Tail, Type, [pack(FNum, optional, Head, Type, []) | Acc]);
 
 pack(FNum, repeated_packed, Data, Type, _) ->
     protobuffs:encode_packed(FNum, Data, Type);
 
 pack(FNum, _, Data, _, _) when is_tuple(Data) ->
-    [RecName|_] = tuple_to_list(Data),
+    [RecName | _] = tuple_to_list(Data),
     protobuffs:encode(FNum, encode(RecName, Data), bytes);
 
-pack(FNum, _, Data, Type, _) when Type=:=bool;Type=:=int32;Type=:=uint32;
-                  Type=:=int64;Type=:=uint64;Type=:=sint32;
-                  Type=:=sint64;Type=:=fixed32;Type=:=sfixed32;
-                  Type=:=fixed64;Type=:=sfixed64;Type=:=string;
-                  Type=:=bytes;Type=:=float;Type=:=double ->
+pack(FNum, _, Data, Type, _) when Type =:= bool;Type =:= int32;Type =:= uint32;
+    Type =:= int64;Type =:= uint64;Type =:= sint32;
+    Type =:= sint64;Type =:= fixed32;Type =:= sfixed32;
+    Type =:= fixed64;Type =:= sfixed64;Type =:= string;
+    Type =:= bytes;Type =:= float;Type =:= double ->
     protobuffs:encode(FNum, Data, Type);
 
 pack(FNum, _, Data, Type, _) when is_atom(Data) ->
-    protobuffs:encode(FNum, enum_to_int(Type,Data), enum).
+    protobuffs:encode(FNum, enum_to_int(Type, Data), enum).
 
-enum_to_int(pikachu,value) ->
+enum_to_int(pikachu, value) ->
     1.
 
-int_to_enum(_,Val) ->
+int_to_enum(_, Val) ->
     Val.
 
 %% DECODE
@@ -152,30 +152,30 @@ decode(Bytes, Types, Acc) ->
                     false ->
                         case lists:member(repeated_packed, Opts) of
                             true ->
-                            {{FNum, V}, R} = protobuffs:decode_packed(Bytes, Type),
-                            {V, R};
+                                {{FNum, V}, R} = protobuffs:decode_packed(Bytes, Type),
+                                {V, R};
                             false ->
-                            {{FNum, V}, R} = protobuffs:decode(Bytes, Type),
-                            {unpack_value(V, Type), R}
+                                {{FNum, V}, R} = protobuffs:decode(Bytes, Type),
+                                {unpack_value(V, Type), R}
                         end
                 end,
             case lists:member(repeated, Opts) of
                 true ->
                     case lists:keytake(FNum, 1, Acc) of
                         {value, {FNum, Name, List}, Acc1} ->
-                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type,Value1)|List]}|Acc1]);
+                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type, Value1) | List]} | Acc1]);
                         false ->
-                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type,Value1)]}|Acc])
+                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type, Value1)]} | Acc])
                     end;
                 false ->
-                    decode(Rest1, Types, [{FNum, Name, int_to_enum(Type,Value1)}|Acc])
+                    decode(Rest1, Types, [{FNum, Name, int_to_enum(Type, Value1)} | Acc])
             end;
         false ->
             case lists:keyfind('$extensions', 2, Acc) of
-                {_,_,Dict} ->
+                {_, _, Dict} ->
                     {{FNum, _V}, R} = protobuffs:decode(Bytes, bytes),
                     Diff = size(Bytes) - size(R),
-                    <<V:Diff/binary,_/binary>> = Bytes,
+                    <<V:Diff/binary, _/binary>> = Bytes,
                     NewDict = dict:store(FNum, V, Dict),
                     NewAcc = lists:keyreplace('$extensions', 2, Acc, {false, '$extensions', NewDict}),
                     decode(R, Types, NewAcc);
@@ -186,18 +186,18 @@ decode(Bytes, Types, Acc) ->
     end.
 
 reverse_repeated_fields(FieldList, Types) ->
-    [ begin
-          case lists:keyfind(FNum, 1, Types) of
-              {FNum, Name, _Type, Opts} ->
-                  case lists:member(repeated, Opts) of
-                      true ->
-                          {FNum, Name, lists:reverse(Value)};
-                      _ ->
-                          Field
-                  end;
-              _ -> Field
-          end
-      end || {FNum, Name, Value}=Field <- FieldList ].
+    [begin
+        case lists:keyfind(FNum, 1, Types) of
+            {FNum, Name, _Type, Opts} ->
+                case lists:member(repeated, Opts) of
+                    true ->
+                        {FNum, Name, lists:reverse(Value)};
+                    _ ->
+                        Field
+                end;
+            _ -> Field
+        end
+    end || {FNum, Name, Value} = Field <- FieldList].
 
 unpack_value(Binary, string) when is_binary(Binary) ->
     binary_to_list(Binary);
@@ -242,12 +242,12 @@ decode_extensions(Types, [{Fnum, Bytes} | Tail], Acc) ->
                 true ->
                     case lists:keytake(FNum, 1, Acc) of
                         {value, {FNum, Name, List}, Acc1} ->
-                            decode(Rest1, Types, [{FNum, Name, lists:reverse([int_to_enum(Type,Value1)|lists:reverse(List)])}|Acc1]);
+                            decode(Rest1, Types, [{FNum, Name, lists:reverse([int_to_enum(Type, Value1) | lists:reverse(List)])} | Acc1]);
                         false ->
-                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type,Value1)]}|Acc])
+                            decode(Rest1, Types, [{FNum, Name, [int_to_enum(Type, Value1)]} | Acc])
                     end;
                 false ->
-                    [{Fnum, {optional, int_to_enum(Type,Value1), Type, Opts}} | Acc]
+                    [{Fnum, {optional, int_to_enum(Type, Value1), Type, Opts}} | Acc]
             end;
         false ->
             [{Fnum, Bytes} | Acc]
@@ -255,18 +255,18 @@ decode_extensions(Types, [{Fnum, Bytes} | Tail], Acc) ->
     decode_extensions(Types, Tail, NewAcc).
 
 set_record_field(Fields, Record, '$extensions', Value) ->
-        Decodable = [],
+    Decodable = [],
     NewValue = decode_extensions(element(1, Record), Decodable, dict:to_list(Value)),
-        Index = list_index('$extensions', Fields),
-        erlang:setelement(Index+1,Record,NewValue);
+    Index = list_index('$extensions', Fields),
+    erlang:setelement(Index + 1, Record, NewValue);
 set_record_field(Fields, Record, Field, Value) ->
     Index = list_index(Field, Fields),
-    erlang:setelement(Index+1, Record, Value).
+    erlang:setelement(Index + 1, Record, Value).
 
-list_index(Target, List) ->  list_index(Target, List, 1).
+list_index(Target, List) -> list_index(Target, List, 1).
 
-list_index(Target, [Target|_], Index) -> Index;
-list_index(Target, [_|Tail], Index) -> list_index(Target, Tail, Index+1);
+list_index(Target, [Target | _], Index) -> Index;
+list_index(Target, [_ | Tail], Index) -> list_index(Target, Tail, Index + 1);
 list_index(_, [], _) -> -1.
 
 extension_size(#pikachu{'$extensions' = Extensions}) ->
@@ -287,9 +287,9 @@ get_extension(#pikachu{'$extensions' = Extensions}, Int) when is_integer(Int) ->
             {ok, Value};
         {ok, Binary} ->
             {raw, Binary};
-         error ->
-             undefined
-     end;
+        error ->
+            undefined
+    end;
 get_extension(_Record, _FieldName) ->
     undefined.
 
