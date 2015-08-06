@@ -23,57 +23,57 @@ import_test_() ->
     parse_test(String, Expected).
 
 message_test_() ->
-    String = "message Test { required string name "
+    String = "message test { required string name "
 	     "= 1; }",
-    Expected = [{message, "Test",
+    Expected = [{message, "test",
 		 [{1, required, "string", "name", none}]}],
     parse_test(String, Expected).
 
 message_default_test_() ->
-    String = "message Test { optional float value "
+    String = "message test { optional float value "
 	     "= 1 [default=0.01]; optional string "
 	     "stringvalue = 2 [default=\"\"];}",
-    Expected = [{message, "Test",
+    Expected = [{message, "test",
 		 [{1, optional, "float", "value", 1.0e-2},
 		  {2, optional, "string", "stringvalue", ""}]}],
     parse_test(String, Expected).
 
 packed_test_() ->
-    String = "message Test { repeated float values "
+    String = "message test { repeated float values "
 	     "= 1 [packed=true]; }",
-    Expected = [{message, "Test",
+    Expected = [{message, "test",
 		 [{1, repeated_packed, "float", "values", []}]}],
     parse_test(String, Expected).
 
 enum_test_() ->
-    String = "enum MyEnum { VALUE0 = 0; VALUE1 = 1;}",
-    Expected = [{enum, "MyEnum",
-		 [{'VALUE0', 0}, {'VALUE1', 1}]}],
+    String = "enum myenum { value0 = 0; value1 = 1;}",
+    Expected = [{enum, "myenum",
+		 [{'value0', 0}, {'value1', 1}]}],
     parse_test(String, Expected).
 
 enum_negative_test_() ->
-    String = "enum MyEnum { VALUE0 = 0; VALUE1 = -1; "
-	     "VALUE2 = 2147483648; VALUE3 = -2147483647;}",
-    Expected = [{enum, "MyEnum",
-		 [{'VALUE0', 0}, {'VALUE1', -1}, {'VALUE2', 2147483648},
-		  {'VALUE3', -2147483647}]}],
+    String = "enum myenum { value0 = 0; value1 = -1; "
+	     "value2 = 2147483648; value3 = -2147483647;}",
+    Expected = [{enum, "myenum",
+		 [{'value0', 0}, {'value1', -1}, {'value2', 2147483648},
+		  {'value3', -2147483647}]}],
     parse_test(String, Expected).
 
 service_test_() ->
-    String = "service SearchService { rpc Search (SearchReq"
-	     "uest) returns (SearchResponse);}",
-    Expected = [{service, "SearchService",
-		 [{rpc, "Search", "SearchRequest", "SearchResponse"}]}],
+    String = "service searchservice { rpc search (searchreq"
+	     "uest) returns (searchresponse);}",
+    Expected = [{service, "searchservice",
+		 [{rpc, "search", "searchrequest", "searchresponse"}]}],
     parse_test(String, Expected).
 
 extensions_test_() ->
-    String = "message Foo { extensions 100 to 199; }",
-    Expected = [{message, "Foo", [{extensions, 100, 199}]}],
+    String = "message foo { extensions 100 to 199; }",
+    Expected = [{message, "foo", [{extensions, 100, 199}]}],
     parse_test(String, Expected).
 
 extend_test_() ->
-    String = "extend Foo { optional int32 bar = 126; }",
-    Expected = [{extend, "Foo",
+    String = "extend foo { optional int32 bar = 126; }",
+    Expected = [{extend, "foo",
 		 [{126, optional, "int32", "bar", none}]}],
     parse_test(String, Expected).
 
@@ -83,18 +83,18 @@ option_test_() ->
     parse_test(String, Expected).
 
 inner_option_test_() ->
-    String = "message Foo { option message_set_wire_format "
+    String = "message foo { option message_set_wire_format "
 	     "= true;}",
-    Expected = [{message, "Foo",
+    Expected = [{message, "foo",
 		 [{option, message_set_wire_format, true}]}],
     parse_test(String, Expected).
 
 nested_message_test_() ->
-    String = "message Test { required Nested nested "
-	     "= 1; message Nested { } }",
-    Expected = [{message, "Test",
-		 [{1, required, "Nested", "nested", none},
-		  {message, "Nested", []}]}],
+    String = "message test { required nested nested "
+	     "= 1; message nested { } }",
+    Expected = [{message, "test",
+		 [{1, required, "nested", "nested", none},
+		  {message, "nested", []}]}],
     parse_test(String, Expected).
 
 parse_test(String, Expected) ->

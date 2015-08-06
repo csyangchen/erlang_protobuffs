@@ -46,7 +46,7 @@ scan_string_test_() ->
      [?_assertMatch(ok,
 		    (protobuffs_compile:scan_string("", "dummy"))),
       ?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { }", "dummy")))]}.
+        (protobuffs_compile:scan_string("message dummy { }", "dummy")))]}.
 
 generate_source_test_() ->
     {foreach, fun setup/0, fun cleanup/1,
@@ -70,17 +70,17 @@ parse_imports_test_() ->
 parse_empty_message_test_() ->
     {foreach, fun setup/0, fun cleanup/1,
      [?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
+        (protobuffs_compile:scan_string("message dummy { }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
       ?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { } message AlsoDummy { }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
+        (protobuffs_compile:scan_string("message dummy { } message alsodummy { }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
       ?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { extensions 100 to 200; }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
+        (protobuffs_compile:scan_string("message dummy { extensions 100 to 200; }", "dummy", [{compile_flags, [warnings_as_errors]}]))),
       ?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { extentions 100 to max; }", "dummy", [{compile_flags, [warnings_as_errors]}])))]}.
+        (protobuffs_compile:scan_string("message dummy { extentions 100 to max; }", "dummy", [{compile_flags, [warnings_as_errors]}])))]}.
 
 parse_enum_test() ->
     {foreach, fun setup/0, fun cleanup/1,
      [?_assertMatch(ok,
-        (protobuffs_compile:scan_string("message Dummy { enum Type { A = 10}}", "dummy", [{compile_flags, [warnings_as_errors]}]))),
+        (protobuffs_compile:scan_string("message dummy { enum type { a = 10}}", "dummy", [{compile_flags, [warnings_as_errors]}]))),
       ?_assertMatch(10, dummy_pb:enum_to_int(dummy_type, 'A')),
       ?_assertMatch('A', dummy_pb:int_to_enum(dummy_type, 10))]}.
