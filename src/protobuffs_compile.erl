@@ -31,7 +31,32 @@
     generate_source/1, generate_source/2]).
 -endif.
 
--record(collected, {enum = [], msg = [], extensions = [], package}).
+-record(enum, {
+    types :: [string()],
+    int :: integer(),
+    atom :: atom()
+}).
+
+-record(collected, {
+    enum = [] :: [#enum{}],
+    msg = [],
+    extensions = [],
+    package
+}).
+
+-record(field, {
+    num_tag :: non_neg_integer(),
+    label :: requried | optional | repeated,
+    type :: string(),
+    name :: string(),
+    default :: term()
+}).
+
+-record(message, {
+    name :: atom(),
+    fields :: [#field{}],
+    extends :: term()
+}).
 
 %%--------------------------------------------------------------------
 %% @doc Generats a built .beam file and header file .hrl
@@ -140,7 +165,7 @@ output(Basename, MessagesRaw, RawEnums, Options) ->
     end,
 
     error_logger:info_msg("Writing header file to ~p~n", [HeaderFile]),
-    ok = write_header_include_file(HeaderFile, Messages),
+    ok = write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
     PokemonBeamFile = code:where_is_file("pokemon_pb.beam"),
     {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
     Forms1 = filter_forms(Messages, Enums, Forms, Basename, []),
@@ -164,7 +189,7 @@ output_source(Basename, MessagesRaw, Enums, Options) ->
             filename:join(HeaderPath, Basename) ++ ".hrl"
     end,
     error_logger:info_msg("Writing header file to ~p~n", [HeaderFile]),
-    ok = write_header_include_file(HeaderFile, Messages),
+    ok = write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
     PokemonBeamFile = filename:dirname(code:which(?MODULE)) ++ "/pokemon_pb.beam",
     {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
     Forms1 = filter_forms(Messages, Enums, Forms, Basename, []),
@@ -635,10 +660,11 @@ collect_full_messages([{enum, Name, Fields} | Tail], Collected) ->
         fun(Field, TmpAcc) ->
             case Field of
                 {EnumAtom, IntValue} ->
-                    [{enum,
-                        [type_path_to_type(LN) || LN <- ListName],
-                        IntValue,
-                        EnumAtom} | TmpAcc];
+                    [#enum{
+                        types = [type_path_to_type(LN) || LN <- ListName],
+                        int = IntValue,
+                        atom = EnumAtom
+                    } | TmpAcc];
                 _ -> TmpAcc
             end
         end, [], Fields),
@@ -777,19 +803,40 @@ resolve_types([], _, _, Acc) ->
     Acc.
 
 %% @hidden
-write_header_include_file(Basename, Messages) when is_list(Basename) ->
-    messages_check(Messages),
+write_header_include_file(Basename, Messages, Enums) when is_list(Basename) ->
     {ok, FileRef} = protobuffs_file:open(Basename, [write]),
-    write_header_include_file(FileRef, Messages),
-    protobuffs_file:close(FileRef);
-write_header_include_file(_FileRef, []) ->
-    ok;
-write_header_include_file(FileRef, [{Name, Fields, Extends} | Tail]) ->
-    OutFields = [{string:to_lower(A), Optional, Default} || {_, Optional, _, A, Default} <- lists:keysort(1, Fields)],
+    write_header_enums(FileRef, Enums),
+    lists:foreach(fun(Message) ->
+        write_header_record(FileRef, Message, Enums)
+    end, Messages),
+    protobuffs_file:close(FileRef).
+
+group_enums(Enums) ->
+    lists:foldl(fun(#enum{types = Types} = Enum, Dict) ->
+        orddict:update(Types, fun(L) -> [Enum | L] end, [Enum], Dict)
+    end, orddict:new(), Enums).
+
+write_header_enums(FileRef, Enums) ->
+%%     erlang:display(Enums),
+    GroupEnums = group_enums(Enums),
+%%     erlang:display(GroupEnums),
+    orddict:map(fun ([Type], Enums2) ->
+        L = lists:keysort(#enum.int, Enums2),
+        DefName = string:to_upper(Type) ++ "_PB_H",
+        protobuffs_file:format(FileRef, "-ifndef(~s).~n-define(~s, true).~n", [DefName, DefName]),
+%%         lists:map(fun (#enum{atom = Atom}) ->
+%%             protobuffs_file:format(FileRef, "-define(~s, ~s).~n", [Atom, Atom])
+%%         end, L),
+        L2 = string:join([atom_to_list(Atom) || #enum{atom = Atom} <- L], "\n    | "),
+        protobuffs_file:format(FileRef, "-type ~s() :: ~s.~n", [Type, L2]),
+        protobuffs_file:format(FileRef, "-endif.~n~n", [])
+    end, GroupEnums).
+
+write_header_record(FileRef, #message{name = Name, fields = Fields, extends = Extends}, Enums) ->
     DefName = string:to_upper(Name) ++ "_PB_H",
     protobuffs_file:format(FileRef, "-ifndef(~s).~n-define(~s, true).~n", [DefName, DefName]),
-    protobuffs_file:format(FileRef, "-record(~s, {~n    ", [string:to_lower(Name)]),
-    WriteFields0 = generate_field_definitions(OutFields),
+    protobuffs_file:format(FileRef, "-record(~s, {~n    ", [Name]),
+    WriteFields0 = lists:map(fun(Field) -> format_field(Field, Enums) end, Fields),
     WriteFields = case Extends of
         disallowed -> WriteFields0;
         _ ->
@@ -799,25 +846,22 @@ write_header_include_file(FileRef, [{Name, Fields, Extends} | Tail]) ->
     FormatString = string:join(["~s" || _ <- lists:seq(1, length(WriteFields))], ",~n    "),
     protobuffs_file:format(FileRef, FormatString, WriteFields),
     protobuffs_file:format(FileRef, "~n}).~n", []),
-    protobuffs_file:format(FileRef, "-endif.~n~n", []),
-    write_header_include_file(FileRef, Tail).
+    protobuffs_file:format(FileRef, "-endif.~n~n", []).
 
-%% @hidden
-generate_field_definitions(Fields) ->
-    generate_field_definitions(Fields, []).
-
-%% @hidden
-generate_field_definitions([], Acc) ->
-    lists:reverse(Acc);
-generate_field_definitions([{Name, required, none} | Tail], Acc) ->
-    Head = lists:flatten(io_lib:format("~s = erlang:error({required, ~s})", [Name, Name])),
-    generate_field_definitions(Tail, [Head | Acc]);
-generate_field_definitions([{Name, _, none} | Tail], Acc) ->
-    Head = lists:flatten(io_lib:format("~s", [Name])),
-    generate_field_definitions(Tail, [Head | Acc]);
-generate_field_definitions([{Name, _, Default} | Tail], Acc) ->
-    Head = lists:flatten(io_lib:format("~s = ~p", [Name, Default])),
-    generate_field_definitions(Tail, [Head | Acc]).
+format_field(#field{name = Name, type = Type, label = Label, default = Default} = Field, Enums) ->
+    Value =
+        case {Label, Default} of
+            {required, none} -> io_lib:format("erlang:error({required, ~s})", [Name]);
+            {_, none} -> "undefined";
+            {_, _} -> io_lib:format("~p", [Default])
+        end,
+    TypeSpec = case is_enum_type(Type, Enums) of
+        true ->
+            io_lib:format("~s()", [Type]);
+        false ->
+            type_spec(Field)
+    end,
+    io_lib:format("~s = ~s :: ~s", [Name, Value, TypeSpec]).
 
 %% @hidden
 % handle ["symbol"]
@@ -837,6 +881,32 @@ replace_atom(List, Find, Replace) when is_list(List) ->
     [replace_atom(Term, Find, Replace) || Term <- List];
 replace_atom(Other, _Find, _Replace) ->
     Other.
+
+%% @hidden
+type_spec(T) when
+    T =:= "double()";
+    T =:= "float()"
+    -> "float()";
+type_spec(Type) when
+    Type =:= "int32";
+    Type =:= "sint32";
+    Type =:= "int64";
+    Type =:= "sint64";
+    Type =:= "fixed32";
+    Type =:= "fixed64";
+    Type =:= "sfixed32";
+    Type =:= "sfixed64"
+    -> "integer()";
+type_spec(Type) when
+    Type =:= "uint32";
+    Type =:= "uint64"
+    -> "non_neg_integer()";
+type_spec("bool") -> "boolean()";
+type_spec("string") -> "string()";
+type_spec("bytes") -> "binary()";
+type_spec(T) when is_list(T) -> io_lib:format("#~s{}", [T]);
+type_spec(#field{label = repeated, type = Type}) -> io_lib:format("[~s]", [type_spec(Type)]);
+type_spec(#field{type = Type}) -> type_spec(Type).
 
 %% @hidden
 is_scalar_type("double") -> true;
@@ -867,9 +937,9 @@ is_enum_type(Type, [TypePath | Paths], Enums) ->
         false ->
             is_enum_type(Type, Paths, Enums)
     end.
+
 is_enum_type(Type, Enums) ->
-    lists:any(fun(Enum) ->
-        Types = element(2, Enum),
+    lists:any(fun(#enum{types = Types}) ->
         lists:member(Type, Types)
     end, Enums).
 
@@ -945,19 +1015,33 @@ type_path_to_type(TypePath) ->
             TypePath
     end.
 
-messages_check([]) ->
-    ok;
-messages_check([{Name, Fields, _Extends} | L]) ->
-    NumTags = lists:sort([element(1, Field) || Field <- Fields]),
+tuple_to_message({Name, Fields, Extends}) ->
+    L = lists:keysort(#field.num_tag, lists:map(fun tuple_to_field/1, Fields)),
+    check_num_tags(Name, L),
+    #message{
+        name = string:to_lower(Name),
+        fields = L,
+        extends = Extends
+    }.
+
+tuple_to_field({NumTag, Label, Type, FieldName, Default}) ->
+    check_label(Label),
+    #field{
+        num_tag = NumTag,
+        label = Label,
+        type = Type,
+        name = string:to_lower(FieldName),
+        default = Default
+    }.
+
+check_num_tags(Name, Fields) ->
+    L = lists:sort(lists:map(fun(#field{num_tag = N}) -> N end, Fields)),
     case lists:seq(1, length(Fields)) of
-        NumTags -> ok;
-        _ -> exit({number_tag_error, Name, NumTags})
-    end,
+        L -> ok;
+        _ -> error({invalid_num_tags, Name, L})
+    end.
 
-    InvalidLabels = [Label || {_, Label, _, _, _} <- Fields, not lists:member(Label, [required, optional, repeated])],
-    case InvalidLabels of
-        [] -> ok;
-        _ -> exit({invalid_labels, Name, InvalidLabels})
-    end,
-
-    messages_check(L).
+check_label(required) -> ok;
+check_label(optional) -> ok;
+check_label(repeated) -> ok;
+check_label(Label) -> error({invalid_label, Label}).
