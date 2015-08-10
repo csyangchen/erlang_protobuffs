@@ -79,13 +79,11 @@ scan_string(String, BaseName) ->
 %%--------------------------------------------------------------------
 -spec scan_file(ProtoFile :: string() | atom(), Options :: list()) ->
     ok | {error, _}.
-scan_file(ProtoFile, Options) when is_list(ProtoFile) ->
-    Basename = filename:basename(ProtoFile, ".proto") ++ "_pb",
-    {ok, String} = parse_file(ProtoFile),
-    scan_string(String, Basename, Options);
 scan_file(ProtoFile, Options) when is_atom(ProtoFile) ->
-    Basename = atom_to_list(ProtoFile) ++ "_pb",
-    {ok, String} = parse_file(atom_to_list(ProtoFile) ++ ".proto"),
+    scan_file(atom_to_list(ProtoFile) ++ ".proto", Options);
+scan_file(ProtoFile, Options) when is_list(ProtoFile) ->
+    Basename = get_basename(ProtoFile, Options),
+    {ok, String} = parse_file(ProtoFile),
     scan_string(String, Basename, Options).
 
 -spec scan_string(String :: string(), Basename :: string(), Options :: list()) ->
@@ -117,7 +115,7 @@ generate_source(ProtoFile) ->
 generate_source(ProtoFile, Options) when is_atom(ProtoFile) ->
     generate_source(atom_to_list(ProtoFile) ++ ".proto", Options);
 generate_source(ProtoFile, Options) when is_list(ProtoFile) ->
-    Basename = filename:basename(ProtoFile, ".proto") ++ "_pb",
+    Basename = get_basename(ProtoFile, Options),
     {ok, String} = parse_file(ProtoFile),
     {ok, FirstParsed} = parse_string(String),
     ImportPaths = ["./", "src/" | proplists:get_value(imports_dir, Options, [])],
@@ -231,8 +229,8 @@ parse_string(String) ->
     end.
 
 %% @hidden
-filter_forms(Msgs, Enums, [{attribute, L, file, {_, _}} | Tail], Basename, Acc) ->
-    filter_forms(Msgs, Enums, Tail, Basename, [{attribute, L, file, {"src/" ++ Basename ++ ".erl", L}} | Acc]);
+filter_forms(Msgs, Enums, [{attribute, _, file, {_, _}} | Tail], Basename, Acc) ->
+    filter_forms(Msgs, Enums, Tail, Basename, Acc);
 
 filter_forms(Msgs, Enums, [{attribute, L, module, pokemon_pb} | Tail], Basename, Acc) ->
     filter_forms(Msgs, Enums, Tail, Basename, [{attribute, L, module, list_to_atom(Basename)} | Acc]);
@@ -1045,3 +1043,8 @@ check_label(required) -> ok;
 check_label(optional) -> ok;
 check_label(repeated) -> ok;
 check_label(Label) -> error({invalid_label, Label}).
+
+get_basename(ProtoFile, Options) when is_list(ProtoFile) ->
+    Prefix = proplists:get_value(prefix, Options, ""),
+    Suffix = proplists:get_value(suffix, Options, "_pb"),
+    Prefix ++ filename:basename(ProtoFile, ".proto") ++ Suffix.
