@@ -1045,6 +1045,6 @@ check_label(repeated) -> ok;
 check_label(Label) -> error({invalid_label, Label}).
 
 get_basename(ProtoFile, Options) when is_list(ProtoFile) ->
-    Prefix = proplists:get_value(prefix, Options, ""),
-    Suffix = proplists:get_value(suffix, Options, "_pb"),
+    Prefix = proplists:get_value(module_name_prefix, Options, ""),
+    Suffix = proplists:get_value(module_name_suffix, Options, "_pb"),
     Prefix ++ filename:basename(ProtoFile, ".proto") ++ Suffix.
