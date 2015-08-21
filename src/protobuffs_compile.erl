@@ -188,8 +188,9 @@ output_source(Basename, MessagesRaw, Enums, Options) ->
     end,
     error_logger:info_msg("Writing header file to ~p~n", [HeaderFile]),
     ok = write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
-    PokemonBeamFile = filename:dirname(code:which(?MODULE)) ++ "/pokemon_pb.beam",
-    {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
+%%     PokemonBeamFile = filename:dirname(code:which(?MODULE)) ++ "/pokemon_pb.beam",
+%%     {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
+    Forms = pokemon_pb_data:forms(),
     Forms1 = filter_forms(Messages, Enums, Forms, Basename, []),
     SrcFile = case proplists:get_value(output_src_dir, Options) of
         undefined ->
