@@ -1,8 +1,8 @@
--module(generate_pokemon_pb_data).
+-module(gen_pokemon_pb_data).
 
--export([main/1]).
+-export([pre_compile/2]).
 
-main(_Args) ->
+pre_compile(_, _) ->
 
     PokemonPb = "src/pokemon_pb.erl",
 
@@ -20,8 +20,14 @@ forms() ->\n
 
     Filename = "src/" ++ ModeName ++ ".erl",
 
-    file:write_file(Filename, Content),
-
+    write_file(Filename, Content),
     ok.
 
-
+write_file(FileName, Content) ->
+    BinContent = iolist_to_binary(Content),
+    case file:read_file(FileName) of
+        {ok, BinContent} ->
+            unchanged;
+        _ ->
+            file:write_file(FileName, Content)
+    end.
