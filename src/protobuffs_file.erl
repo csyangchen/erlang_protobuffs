@@ -7,7 +7,7 @@
 
 -module(protobuffs_file).
 
--export([open/2, path_open/3, close/1, format/3, request/1, compile_forms/2, write_file/2]).
+-export([open/2, path_open/3, close/1, format/3, request/1, compile_forms/2, write_file/2, mv/2]).
 
 open(File, Options) ->
     file:open(File, Options).
@@ -27,5 +27,17 @@ request(InFile) ->
 compile_forms(Forms, Options) ->
     compile:forms(Forms, [return] ++ Options).
 
-write_file(File, Bytes) ->
-    file:write_file(File, Bytes).
+write_file(FileName, Content) ->
+    BinContent = iolist_to_binary(Content),
+    case file:read_file(FileName) of
+        {ok, BinContent} ->
+            unchanged;
+        _ ->
+            file:write_file(FileName, Content)
+    end.
+
+mv(From, To) ->
+    {ok, Content} = file:read_file(From),
+    ok = file:delete(From),
+    write_file(To, Content).
+

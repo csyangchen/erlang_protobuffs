@@ -162,10 +162,8 @@ output(Basename, MessagesRaw, RawEnums, Options) ->
             filename:join(HeaderPath, Basename) ++ ".hrl"
     end,
 
-    error_logger:info_msg("Writing header file to ~p~n", [HeaderFile]),
-    ok = write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
-    PokemonBeamFile = code:where_is_file("pokemon_pb.beam"),
-    {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
+    write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
+    Forms = pokemon_pb_data:forms(),
     Forms1 = filter_forms(Messages, Enums, Forms, Basename, []),
     {ok, _, Bytes, _Warnings} = protobuffs_file:compile_forms(Forms1, proplists:get_value(compile_flags, Options, [])),
     BeamFile = case proplists:get_value(output_ebin_dir, Options) of
@@ -186,10 +184,8 @@ output_source(Basename, MessagesRaw, Enums, Options) ->
         HeaderPath ->
             filename:join(HeaderPath, Basename) ++ ".hrl"
     end,
-    error_logger:info_msg("Writing header file to ~p~n", [HeaderFile]),
-    ok = write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
-%%     PokemonBeamFile = filename:dirname(code:which(?MODULE)) ++ "/pokemon_pb.beam",
-%%     {ok, {_, [{abstract_code, {_, Forms}}]}} = beam_lib:chunks(PokemonBeamFile, [abstract_code]),
+
+    write_header_include_file(HeaderFile, lists:map(fun tuple_to_message/1, Messages), Enums),
     Forms = pokemon_pb_data:forms(),
     Forms1 = filter_forms(Messages, Enums, Forms, Basename, []),
     SrcFile = case proplists:get_value(output_src_dir, Options) of
@@ -198,8 +194,9 @@ output_source(Basename, MessagesRaw, Enums, Options) ->
         SrcPath ->
             filename:join(SrcPath, Basename) ++ ".erl"
     end,
-    error_logger:info_msg("Writing src file to ~p~n", [SrcFile]),
-    protobuffs_file:write_file(SrcFile, erl_prettypr:format(erl_syntax:form_list(Forms1))).
+
+    Status = protobuffs_file:write_file(SrcFile, erl_prettypr:format(erl_syntax:form_list(Forms1))),
+    error_logger:info_msg("Write src file to ~p ~p~n", [SrcFile, Status]).
 
 %% @hidden
 parse_file(FileName) ->
@@ -802,13 +799,16 @@ resolve_types([], _, _, Acc) ->
     Acc.
 
 %% @hidden
-write_header_include_file(Basename, Messages, Enums) when is_list(Basename) ->
-    {ok, FileRef} = protobuffs_file:open(Basename, [write]),
+write_header_include_file(HeaderFile, Messages, Enums) when is_list(HeaderFile) ->
+    TmpFile = HeaderFile ++ ".tmp",
+    {ok, FileRef} = protobuffs_file:open(TmpFile, [write]),
     write_header_enums(FileRef, Enums),
     lists:foreach(fun(Message) ->
         write_header_record(FileRef, Message, Enums)
     end, Messages),
-    protobuffs_file:close(FileRef).
+    protobuffs_file:close(FileRef),
+    Status = protobuffs_file:mv(TmpFile, HeaderFile),
+    error_logger:info_msg("Writing header file to ~p ~p~n", [HeaderFile, Status]).
 
 group_enums(Enums) ->
     lists:foldl(fun(#enum{types = Types} = Enum, Dict) ->
