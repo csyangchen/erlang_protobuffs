@@ -1,5 +1,5 @@
 Definitions.
-L = [a-z_\.]
+L = [A-Za-z_\.]
 D = [0-9]
 F = (\+|-)?[0-9]+\.[0-9]+((E|e)(\+|-)?[0-9]+)?
 HEX = 0x[0-9A-Fa-f]+
@@ -8,12 +8,12 @@ S = [\(\)\]\[\{\};=]
 
 Rules.
 
-{L}({L}|{D})* : {token, {var, TokenLine,list_to_atom(TokenChars)}}.
-'({L}|{D})+' : S = strip(TokenChars,TokenLen),
-         {token,{string,TokenLine,S}}.
-"({L}|{D}|/)*" : S = strip(TokenChars,TokenLen),
-         {token,{string,TokenLine,S}}.
-{S} : {token, {list_to_atom(TokenChars),TokenLine}}.
+{L}({L}|{D})* : {token, {var, TokenLine, list_to_atom(lower(TokenChars))}}.
+'({L}|{D})+' : S = strip(TokenChars, TokenLen), 
+         {token, {string, TokenLine, lower(S)}}.
+"({L}|{D}|/)*" : S = strip(TokenChars, TokenLen), 
+         {token, {string, TokenLine, lower(S)}}.
+{S} : {token, {list_to_atom(lower(TokenChars)), TokenLine}}.
 {WS}+  : skip_token.
 //.* : skip_token.
 /\*([^\*]|\*[^/])*\*/ : skip_token.
@@ -22,10 +22,12 @@ Rules.
 {HEX} : {token, {integer, TokenLine, hex_to_int(TokenChars)}}.
 
 Erlang code.
-strip(TokenChars,TokenLen) -> 
+strip(TokenChars, TokenLen) -> 
     lists:sublist(TokenChars, 2, TokenLen - 2).
 
-hex_to_int([_,_|R]) ->
-    {ok,[Int],[]} = io_lib:fread("~16u", R),
+hex_to_int([_, _|R]) ->
+    {ok, [Int], []} = io_lib:fread("~16u", R), 
     Int.
     
+lower(TokenChars) ->
+    string:to_lower(TokenChars).

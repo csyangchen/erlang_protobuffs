@@ -24,6 +24,8 @@ setup() ->
         (A, B) -> meck:passthrough([A,B]) end),
     meck:expect(protobuffs_file, write_file,
 		fun (_, _) -> ok end),
+    meck:expect(protobuffs_file, mv,
+        fun (_, _) -> ok end),
     meck:expect(protobuffs_file, format,
 		fun (_, _, _) -> ok end),
     meck:expect(protobuffs_file, path_open,
